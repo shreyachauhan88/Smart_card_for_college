@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Card Payment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        header {
+            background-color: #4CAF50;
+            padding: 10px;
+            color: white;
+        }
+        .logo {
+            width: 100px;
+            height: auto;
+            margin-bottom: 10px;
+        }
+        .scanner, .payment, .payment-success {
+            margin: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        video {
+            width: 100%;
+            max-width: 400px;
+            margin: 20px auto;
+            border: 2px solid #000;
+            border-radius: 8px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        form input, form button {
+            margin: 10px;
+            padding: 10px;
+            width: 80%;
+            max-width: 300px;
+            border: 1px solid #4CAF50;
+            border-radius: 5px;
+        }
+        form button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        form button:hover {
+            background-color: #45a049;
+        }
+        .success-icon {
+            width: 100px;
+            height: 100px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="assets/logo.png" alt="College Logo" class="logo">
+        <h1>College Smart Card Payment</h1>
+    </header>
+
+    <main>
+        <!-- Scanner Section -->
+        <section class="scanner" id="scannerSection">
+            <h2>Scan to Pay</h2>
+            <video id="cameraPreview" autoplay></video>
+            <button id="scanButton">Start QR Code Scan</button>
+        </section>
+
+        <!-- Payment Form Section (Initially Hidden) -->
+        <section class="payment" id="paymentSection" style="display: none;">
+            <h2>Payment Details</h2>
+            <p>Pay to: <span id="recipientName"></span></p>
+            <p>UPI ID: <span id="upiId"></span></p>
+            <form id="paymentForm">
+                <label for="amount">Enter Amount:</label>
+                <input type="number" id="amount" placeholder="Enter Amount" required>
+
+                <label for="upiPin">Enter UPI Pin:</label>
+                <input type="password" id="upiPin" placeholder="Enter UPI Pin" required>
+
+                <button type="submit">Proceed to Pay</button>
+            </form>
+        </section>
+
+        <!-- Payment Success Section (Initially hidden) -->
+        <section class="payment-success" id="successSection" style="display: none;">
+            <h2>Payment Successful!</h2>
+            <img src="https://via.placeholder.com/100/00FF00?text=✔" alt="Success" class="success-icon">
+            <p>Transaction ID: <span id="transactionID"></span></p>
+            <p>Amount Paid: ₹<span id="paidAmount"></span></p>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 College Smart Card System</p>
+    </footer>
+
+    <!-- Instascan.js for QR Code Scanning -->
+    <script src="https://rawgit.com/schmich/instascan-builds/master/instascan.min.js"></script>
+
+    <script>
+        // Initialize the QR scanner
+        let scanner = new Instascan.Scanner({ video: document.getElementById('cameraPreview') });
+
+        document.getElementById('scanButton').addEventListener('click', function () {
+            // Check if the device is mobile (screen width <= 768px)
+            if (window.innerWidth <= 768) {
+                console.log("Starting camera for mobile devices.");
+                
+                // Start the scanner
+                Instascan.Camera.getCameras().then(function (cameras) {
+                    console.log("Available cameras:", cameras); // Debugging: log the available cameras
+                    if (cameras.length > 0) {
+                        scanner.start(cameras[0]); // Start with the first camera
+                        console.log("Camera started successfully.");
+                    } else {
+                        alert('No cameras found.');
+                        console.log('No cameras were detected on the device.'); // Debugging: log no camera found
+                    }
+                }).catch(function (e) {
+                    console.error('Error accessing camera:', e); // Debugging: log any camera access errors
+                    alert('Error accessing camera. Please check permissions.');
+                });
+            } else {
+                alert('Camera scanning is not supported on devices larger than mobile screens.');
+                console.log("Camera scanning attempted on unsupported device."); // Debugging: log when attempted on unsupported screen
+            }
+        });
+
+        // QR Code scan listener
+        scanner.addListener('scan', function (content) {
+            console.log('Scanned content:', content); // Debugging: log the scanned content
+            if (content.startsWith('upi://')) {
+                const params = new URLSearchParams(content.split('upi://pay?')[1]);
+                const recipientName = params.get('pn');
+                const upiId = params.get('pa');
+                const amount = params.get('am');
+
+                // Hide the scanner section and stop the camera
+                document.getElementById('scannerSection').style.display = 'none';
+                scanner.stop();  // Stop the camera
+
+                // Show the payment form and populate details
+                document.getElementById('paymentSection').style.display = 'block';
+                document.getElementById('recipientName').textContent = recipientName;
+                document.getElementById('upiId').textContent = upiId;
+
+                if (amount) {
+                    document.getElementById('amount').value = amount;
+                }
+                console.log("Valid UPI QR code detected. Payment details extracted.");
+            } else {
+                alert('Invalid QR code. Please scan a valid UPI payment QR code.');
+                console.log("Invalid QR code scanned."); // Debugging: log when an invalid QR code is scanned
+            }
+        });
+
+        // Payment form submission
+        document.getElementById('paymentForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const amount = document.getElementById('amount').value;
+            const upiPin = document.getElementById('upiPin').value;
+
+            if (upiPin.length !== 6) {
+                alert('UPI Pin should be 6 digits.');
+                console.log("Invalid UPI pin entered."); // Debugging: log when an invalid UPI pin is entered
+                return;
+            }
+
+            const transactionID = 'TXN' + Math.floor(Math.random() * 1000000);
+            document.getElementById('paymentSection').style.display = 'none';
+            document.getElementById('successSection').style.display = 'block';
+            document.getElementById('transactionID').textContent = transactionID;
+            document.getElementById('paidAmount').textContent = amount;
+
+            console.log("Payment successful. Transaction ID:", transactionID, "Amount:", amount); // Debugging: log payment success details
+        });
+    </script>
+</body>
+</html>
